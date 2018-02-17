@@ -19,9 +19,7 @@ if __debug__:
         display.bar(Display.WIDTH - 8, 0, 8, 8, 0xF800)
         display.refresh()
     loop.after_step_hook = debug_display_refresh
-
-# in both debug and production, emulator needs to draw the screen explicitly
-elif model() == 'EMU':
+else:
     loop.after_step_hook = display.refresh
 
 # import constants from modtrezorui
