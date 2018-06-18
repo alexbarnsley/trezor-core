@@ -40,6 +40,6 @@ def derive_node_without_passphrase(path: list, curve_name: str = _DEFAULT_CURVE)
     return node
 
 
-def remove_ed25519_public_key_prefix(pubkey: bytes) -> bytes:
+def remove_ed25519_prefix(pubkey: bytes) -> bytes:
     # 0x01 prefix is not part of the actual public key, hence removed
     return pubkey[1:]
