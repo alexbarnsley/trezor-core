@@ -1,13 +1,7 @@
-from binascii import hexlify
-from io import BytesIO
-from decimal import Decimal
-from hashlib import sha256
-import types
-import six
-from six.moves import filter
-from six.moves import map
-from six.moves import zip
-import binascii
+# TODO !! Taken from https://github.com/miracle2k/ripple-python
+
+from ubinascii import hexlify, unhexlify
+from trezor.crypto.hashlib import sha256
 
 
 __all__ = ('serialize_object',)
@@ -201,12 +195,10 @@ INVERSE_FIELDS_MAP = {
 
 def serialize_object(obj, hex=True):
     """This is your main entry point to serialize something."""
-    stream = BytesIO()
+    stream = bytearray()
     TypeSerializers.STObject(stream, obj, no_marker=True)
-    stream.seek(0)
-    bytes = stream.getvalue()
     if hex:
-        return fmt_hex(bytes)
+        return fmt_hex(stream)
     return bytes
 
 
@@ -217,13 +209,13 @@ def serialize_field(stream, name, value):
     tag_byte = (type_bits << 4 if type_bits < 16 else 0) | \
                (field_bits if field_bits < 16 else 0)
 
-    if name == 'LedgerEntryType' and isinstance(value, six.string_types):
+    if name == 'LedgerEntryType' and isinstance(value, str):
         value = LEDGER_ENTRY_TYPES[value][0]
 
-    if name == 'TransactionType' and isinstance(value, six.string_types):
+    if name == 'TransactionType' and isinstance(value, str):
         value = TRANSACTION_TYPES[value]
 
-    if name == 'TransactionResult' and isinstance(value, six.string_types):
+    if name == 'TransactionResult' and isinstance(value, str):
         value = TRANSACTION_RESULT_VALUES[value]
 
     if hasattr(value, '__json__'):
@@ -252,7 +244,7 @@ def serialize_hex(stream, hexstring):
 def serialize_bytes(stream, bytes):
     """Serialize a variable length bytestring."""
     serialize_varint(stream, len(bytes))
-    stream.write(bytes)
+    stream.extend(bytes)
 
 
 def UInt160(value):
@@ -280,10 +272,10 @@ def serialize_varint(stream, val):
         bytes.append(val)
     elif val <= 12480:
         val -= 193
-        bytes.append([193 + rshift(val,  8), val & 0xff])
+        bytes.extend([193 + rshift(val,  8), val & 0xff])
     elif val <= 918744:
         val -= 12481
-        bytes.append([
+        bytes.extend([
             241 + rshift(val, 16),
             rshift(val, 8) & 0xff,
             val & 0xff
@@ -291,33 +283,37 @@ def serialize_varint(stream, val):
     else:
         raise ValueError('Variable integer overflow.')
 
-    stream.write(bytes)
+    stream.extend(bytes)
+
+#
+# class AllStatic(type):  # todo? commented out because of types.FunctionType - do we need it?
+#     def __new__(cls, name, bases, attrs):
+#         for key, value in attrs.items():
+#             if isinstance(value, types.FunctionType):
+#                 attrs[key] = staticmethod(value)
+#         return type.__new__(cls, name, bases, attrs)
 
 
-class AllStatic(type):
-    def __new__(cls, name, bases, attrs):
-        for key, value in attrs.items():
-            if isinstance(value, types.FunctionType):
-                attrs[key] = staticmethod(value)
-        return type.__new__(cls, name, bases, attrs)
+def byte_writer(num_bytes):
+    def func(stream: bytearray, value):
+        stream.extend(to_bytes(int(value), num_bytes))
+    return func
 
 
 class TypeSerializers:
     # See ripple-lib:serializedtypes.js for the originals.
 
-    __metaclass__ = AllStatic
-    def byte_writer(num_bytes):
-        def func(stream, value):
-            stream.write(to_bytes(int(value), num_bytes))
-        return func
+    # __metaclass__ = AllStatic  # todo see above
 
     STInt8 = byte_writer(1)
     STInt16 = byte_writer(2)
     STInt32 = byte_writer(4)
 
+    @staticmethod
     def STAccount(stream, value):
         serialize_bytes(stream, UInt160(value))
 
+    @staticmethod
     def STAmount(stream, amount):
         if isinstance(amount, dict):
             # non-XRP
@@ -336,14 +332,14 @@ class TypeSerializers:
 
             # Remaining 52 bits: mantissa
             # Merge the manually constructed high-bits into the value
-            value = value | (hi<<32)
+            value = value | (hi << 32)
 
             # Write Amount
-            stream.write(to_bytes(value, 8))
+            stream.extend(to_bytes(value, 8))
             # Write Currency
             TypeSerializers.STCurrency(stream, amount['currency'])
             # Write Issuer
-            stream.write(
+            stream.extend(
                 RippleBaseDecoder.decode(amount['issuer'], 25))
         else:
             # XRP - only support int notation for now, not floats.
@@ -352,8 +348,7 @@ class TypeSerializers:
             # Make a 64 bit hex string
             amount_hex = '%x' % abs(amount)
             assert len(amount_hex) <= 16
-            amount_hex = amount_hex.zfill(16)
-
+            amount_hex = zfill(amount_hex, 16)
             amount_bytes = bytearray(decode_hex(amount_hex))
 
             # Clear first bit to indicate XRP
@@ -362,8 +357,9 @@ class TypeSerializers:
             if amount >= 0:
                 amount_bytes[0] |= 0x40
 
-            stream.write(amount_bytes)
+            stream.extend(amount_bytes)
 
+    @staticmethod
     def STCurrency(stream, value):
         # https://ripple.com/wiki/Currency_Format
         value = value.upper()
@@ -378,13 +374,14 @@ class TypeSerializers:
             # to introduce a special class; for now we use a simple string.
             # ripple-lib:currency.js will help to look at, and also
             # "Currency_format" format on the wiki.
-            stream.write(bytearray(20))
+            stream.extend(bytearray(20))
 
         else:
             data = bytearray(20)
             data[12:15] = map(ord, value)
-            stream.write(data)
+            stream.extend(data)
 
+    @staticmethod
     def STPathSet(stream, value):
         typeBoundary =  0xff
         typeEnd = 0x00
@@ -411,18 +408,20 @@ class TypeSerializers:
 
                 TypeSerializers.STInt8(stream, entry['type'])
                 if entry['type'] & typeAccount:
-                    stream.write(UInt160(entry['account']))
+                    stream.extend(UInt160(entry['account']))
                 if entry['type'] & typeCurrency:
                     TypeSerializers.STCurrency(stream, entry['currency'])
                 if entry['type'] & typeIssuer:
-                    stream.write(UInt160(entry['issuer']))
+                    stream.extend(UInt160(entry['issuer']))
 
         TypeSerializers.STInt8(stream, typeEnd)
 
+    @staticmethod
     def STVL(stream, value):
         # A variable length string, hex-encoded
         serialize_hex(stream, value)
 
+    @staticmethod
     def STObject(stream, value, no_marker=False):
         # Ignore lower case field names - non-serializable by convention
         keys = filter(lambda k: not k.islower(), value.keys())
@@ -434,6 +433,10 @@ class TypeSerializers:
             serialize_field(stream, key, value[key])
         if not no_marker:
             TypeSerializers.STInt8(stream, 0xe1)  # Object ending marker
+
+
+def zfill(value: str, length: int) -> str:
+    return '0' * (length - len(value)) + value
 
 
 def sort_fields(keys):
@@ -449,7 +452,7 @@ def parse_non_native_amount(string):
     """Like ``Amount.parse_human()`` in ripple-lib, will parse the
     given value into an integer and exponent offset.
     """
-    amount = Decimal(string)
+    amount = Decimal(string)  # todo !!! convert to micropython
     # This will remove trailing zeros
     amount = amount.normalize()
 
@@ -487,7 +490,7 @@ def to_bytes(number, length=None, endianess='big'):
     if length:
         if len(s) > length*2:
             raise ValueError('number of large for {} bytes'.format(length))
-        s = s.zfill(length*2)
+        s = zfill(s, length * 2)  # todo confirm is this equal to s.zfill(length*2) ?
     s = decode_hex(s)
     return s if endianess == 'big' else s[::-1]
 
@@ -495,7 +498,7 @@ def to_bytes(number, length=None, endianess='big'):
 def from_bytes(bytes):
     """Reverse of to_bytes()."""
     # binascii works on all versions of Python, the hex encoding does not
-    return int(binascii.hexlify(bytes), 16)
+    return int(hexlify(bytes), 16)
 
 
 def fmt_hex(bytes):
@@ -506,17 +509,14 @@ def fmt_hex(bytes):
     # guarantee an even-length string.
     #
     # binascii works on all versions of Python, the hex encoding does not.
-    hex = binascii.hexlify(bytes)
+    hex = hexlify(bytes)
     hex = hex.decode()  # Returns bytes, which makes no sense to me
     return hex.upper()
 
 
 def decode_hex(hex_string):
     """Decode a string like "fa4b21" to actual bytes."""
-    if six.PY3:
-        return bytes.fromhex(hex_string)
-    else:
-        return hex_string.decode('hex')
+    return unhexlify(hex_string)
 
 
 class RippleBaseDecoder(object):
@@ -579,7 +579,7 @@ class RippleBaseDecoder(object):
         res = ''.join(res[::-1])
 
         # Encode leading zeros as base58 zeros
-        czero = 0 if six.PY3 else b'\x00'
+        czero = 0
         pad = 0
         for c in data:
             if c == czero:
@@ -605,10 +605,9 @@ def call_encoder(func, *a, **kw):
         encoder('Account', 'r3kmLJN5D28dHuH8vZNUZpMC43pEHpaocV')
     """
     def call_util(*a, **kw):
-        buffer = BytesIO()
+        buffer = bytearray()
         func(buffer, *a, **kw)
-        buffer.seek(0)
-        return fmt_hex(buffer.getvalue())
+        return fmt_hex(buffer)
     if a or kw:
         return call_util(*a, **kw)
     return call_util
