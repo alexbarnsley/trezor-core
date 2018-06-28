@@ -1,9 +1,14 @@
 from trezor.crypto import base58ripple
 from trezor.crypto.hashlib import sha256
 from trezor.crypto.hashlib import ripemd160
+from micropython import const
+
+HASH_TX_ID = 0x54584E00  # 'TXN'
+HASH_TX_SIGN = const(0x53545800)  # 'STX'
+HASH_TX_SIGN_TESTNET = 0x73747800  # 'stx'
 
 
-def address_from_public_key(pubkey: bytes):
+def address_from_public_key(pubkey: bytes) -> str:
     """Extracts public key from an address
 
     Ripple address is in format:
@@ -23,3 +28,9 @@ def address_from_public_key(pubkey: bytes):
     address.append(0x00)  # 'r'
     address.extend(h)
     return base58ripple.encode_check(bytes(address))
+
+
+def decode_address(address: str):
+    """Returns so called Account ID"""
+    adr = base58ripple.decode_check(address)
+    return adr[1:]
