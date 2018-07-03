@@ -7,3 +7,9 @@ verify_ssl = true
 trezor = {git = "https://github.com/trezor/python-trezor", editable = true, ref = "master"}
 pytest = "*"
 mock = "*"
+isort = "*"
+flake8 = "*"
+black = "*"
+
+[pipenv]
+allow_prereleases = true
