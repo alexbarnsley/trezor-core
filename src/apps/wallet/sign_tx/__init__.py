@@ -1,9 +1,15 @@
 from trezor import ui, wire
 from trezor.messages.MessageType import TxAck
-from trezor.messages.TxRequest import TxRequest
 from trezor.messages.RequestType import TXFINISHED
+from trezor.messages.TxRequest import TxRequest
+
 from apps.common import seed
-from apps.wallet.sign_tx.helpers import UiConfirmOutput, UiConfirmTotal, UiConfirmFeeOverThreshold, UiConfirmForeignAddress
+from apps.wallet.sign_tx.helpers import (
+    UiConfirmFeeOverThreshold,
+    UiConfirmForeignAddress,
+    UiConfirmOutput,
+    UiConfirmTotal,
+)
 
 
 @ui.layout
