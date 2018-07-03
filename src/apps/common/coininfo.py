@@ -1,5 +1,4 @@
 class CoinInfo:
-
     def __init__(
         self,
         coin_name: str,
@@ -16,7 +15,7 @@ class CoinInfo:
         fork_id: int,
         force_bip143: bool,
         version_group_id: int,
-        bip115: bool
+        bip115: bool,
     ):
         self.coin_name = coin_name
         self.coin_shortcut = coin_shortcut

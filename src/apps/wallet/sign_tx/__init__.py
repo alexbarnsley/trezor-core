@@ -50,5 +50,5 @@ async def sign_tx(ctx, msg):
         elif isinstance(req, UiConfirmForeignAddress):
             res = await layout.confirm_foreign_address(ctx, req.address_n, req.coin)
         else:
-            raise TypeError('Invalid signing instruction')
+            raise TypeError("Invalid signing instruction")
     return req
