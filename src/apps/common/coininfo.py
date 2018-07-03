@@ -35,8 +35,9 @@ class CoinInfo:
         self.bip115 = bip115
 
 
-# the following list is generated using tools/codegen/gen_coins.py
+# generated using tools/codegen/gen_coins.py
 # do not edit manually!
+# fmt: off
 COINS = [
     CoinInfo(
         coin_name='Bitcoin',
