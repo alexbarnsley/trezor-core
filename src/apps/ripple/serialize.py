@@ -27,6 +27,7 @@ FIELDS_MAP = {
     'type': FIELD_TYPE_INT16 << 4 | 2,
     'signingPubKey': FIELD_TYPE_VL << 4 | 3,
     'flags': FIELD_TYPE_INT32 << 4 | 2,
+    'txnSignature': FIELD_TYPE_VL << 4 | 4,
 }
 
 TRANSACTION_TYPES = {
@@ -36,7 +37,7 @@ TRANSACTION_TYPES = {
 FLAG_FULLY_CANONICAL = 0x80000000
 
 
-def serialize(common: RippleSignTx, tx_type: RipplePaymentTxType, pubkey: bytes=None):
+def serialize(common: RippleSignTx, tx_type: RipplePaymentTxType, pubkey=None, signature=None):
     w = bytearray()
     # must be sorted numerically first by type and then by name
     write(w, FIELDS_MAP['type'], TRANSACTION_TYPES['Payment'])
@@ -45,16 +46,10 @@ def serialize(common: RippleSignTx, tx_type: RipplePaymentTxType, pubkey: bytes=
     write(w, FIELDS_MAP['amount'], tx_type.amount)
     write(w, FIELDS_MAP['fee'], common.fee)
     write(w, FIELDS_MAP['signingPubKey'], pubkey)
+    write(w, FIELDS_MAP['txnSignature'], signature)
     write(w, FIELDS_MAP['account'], common.account)
     write(w, FIELDS_MAP['destination'], tx_type.destination)
     return w
-
-
-def serialize_for_signing(common: RippleSignTx, tx_type: RipplePaymentTxType, pubkey: bytes):
-    """Network prefix is prepended before the transaction and public key is included"""
-    w = serialize(common, tx_type, pubkey)
-    prefix = helpers.HASH_TX_SIGN.to_bytes(4, 'big')
-    return prefix + w
 
 
 def write(w: bytearray, field_type: int, value):

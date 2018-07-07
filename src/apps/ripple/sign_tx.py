@@ -7,7 +7,7 @@ from trezor.messages.RippleSignedTx import RippleSignedTx
 from trezor.messages.RippleTxTypeRequest import RippleTxTypeRequest
 from trezor.messages import MessageType
 from trezor.wire import ProcessError
-from .serialize import serialize_for_signing
+from .serialize import serialize
 from . import helpers
 
 
@@ -18,10 +18,19 @@ async def sign_tx(ctx, msg: RippleSignTx):
         raise ProcessError('Source address is not equal to the one derived from a public key')
 
     tx_type = await ctx.call(RippleTxTypeRequest(), MessageType.RipplePaymentTxType)
-    tx = serialize_for_signing(msg, tx_type, node.public_key())
 
-    signature = ecdsa_sign(node.private_key(), first_half_of_sha512(tx))
-    return RippleSignedTx(signature)
+    tx = serialize(msg, tx_type, pubkey=node.public_key())
+    to_sign = get_network_prefix() + tx
+
+    signature = ecdsa_sign(node.private_key(), first_half_of_sha512(to_sign))
+
+    tx = serialize(msg, tx_type, pubkey=node.public_key(), signature=signature)
+    return RippleSignedTx(signature, tx)
+
+
+def get_network_prefix():
+    """Network prefix is prepended before the transaction and public key is included"""
+    return helpers.HASH_TX_SIGN.to_bytes(4, 'big')
 
 
 def first_half_of_sha512(b):

@@ -1,7 +1,7 @@
 from common import *
 from apps.ripple.serialize import serialize
 from apps.ripple.serialize import serialize_amount
-from apps.ripple.serialize import serialize_for_signing
+from apps.ripple.sign_tx import get_network_prefix
 from trezor.messages.RippleSignTx import RippleSignTx
 from trezor.messages.RipplePaymentTxType import RipplePaymentTxType
 
@@ -51,17 +51,18 @@ class TestRippleSerializer(unittest.TestCase):
         # https://github.com/ripple/ripple-binary-codec/blob/4581f1b41e712f545ba08be15e188a557c731ecf/test/signing-data-encoding-test.js
         common = RippleSignTx(None, 'r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ', 10, 2147483648, 1)
         tx_type = RipplePaymentTxType(1000, 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh')
-        blob = serialize_for_signing(common, tx_type, unhexlify('ed5f5ac8b98974a3ca843326d9b88cebd0560177b973ee0b149f782cfaa06dc66a'))
-        assert blob[0:4] == unhexlify('53545800')  # signing prefix
-        assert blob[4:7] == unhexlify('120000')  # transaction type
-        assert blob[7:12] == unhexlify('2280000000')  # flags
-        assert blob[12:17] == unhexlify('2400000001')  # sequence
-        assert blob[17:26] == unhexlify('6140000000000003e8')  # amount
-        assert blob[26:35] == unhexlify('68400000000000000a')  # fee
-        assert blob[35:70] == unhexlify('7321ed5f5ac8b98974a3ca843326d9b88cebd0560177b973ee0b149f782cfaa06dc66a')  # singing pub key
-        assert blob[70:92] == unhexlify('81145b812c9d57731e27a2da8b1830195f88ef32a3b6')  # account
-        assert blob[92:114] == unhexlify('8314b5f762798a53d543a014caf8b297cff8f2f937e8')  # destination
-        assert len(blob[114:]) == 0  # that's it
+        tx = serialize(common, tx_type, pubkey=unhexlify('ed5f5ac8b98974a3ca843326d9b88cebd0560177b973ee0b149f782cfaa06dc66a'))
+        tx = get_network_prefix() + tx
+        assert tx[0:4] == unhexlify('53545800')  # signing prefix
+        assert tx[4:7] == unhexlify('120000')  # transaction type
+        assert tx[7:12] == unhexlify('2280000000')  # flags
+        assert tx[12:17] == unhexlify('2400000001')  # sequence
+        assert tx[17:26] == unhexlify('6140000000000003e8')  # amount
+        assert tx[26:35] == unhexlify('68400000000000000a')  # fee
+        assert tx[35:70] == unhexlify('7321ed5f5ac8b98974a3ca843326d9b88cebd0560177b973ee0b149f782cfaa06dc66a')  # singing pub key
+        assert tx[70:92] == unhexlify('81145b812c9d57731e27a2da8b1830195f88ef32a3b6')  # account
+        assert tx[92:114] == unhexlify('8314b5f762798a53d543a014caf8b297cff8f2f937e8')  # destination
+        assert len(tx[114:]) == 0  # that's it
 
 
 if __name__ == '__main__':
