@@ -7,6 +7,14 @@ from micropython import const
 HASH_TX_SIGN = const(0x53545800)  # 'STX'
 # HASH_TX_SIGN_TESTNET = const(0x73747800)  # 'stx'
 
+# https://developers.ripple.com/basic-data-types.html#specifying-currency-amounts
+DIVISIBILITY = const(6)  # 1000000 drops equal 1 XRP
+
+# https://developers.ripple.com/transaction-cost.html
+MIN_FEE = const(10)
+# max is not defined officially but we check to make sure
+MAX_FEE = const(1000000)  # equals 1 XRP
+
 
 def address_from_public_key(pubkey: bytes) -> str:
     """Extracts public key from an address

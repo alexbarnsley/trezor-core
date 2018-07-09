@@ -9,6 +9,7 @@ from trezor.messages import MessageType
 from trezor.wire import ProcessError
 from .serialize import serialize
 from . import helpers
+from . import layout
 
 
 async def sign_tx(ctx, msg: RippleSignTx):
@@ -22,10 +23,19 @@ async def sign_tx(ctx, msg: RippleSignTx):
     tx = serialize(msg, tx_type, pubkey=node.public_key())
     to_sign = get_network_prefix() + tx
 
-    signature = ecdsa_sign(node.private_key(), first_half_of_sha512(to_sign))
+    check_fee(msg.fee)
 
+    await layout.require_confirm_fee(ctx, msg.fee)
+    await layout.require_confirm_tx(ctx, tx_type.destination, tx_type.amount)
+
+    signature = ecdsa_sign(node.private_key(), first_half_of_sha512(to_sign))
     tx = serialize(msg, tx_type, pubkey=node.public_key(), signature=signature)
     return RippleSignedTx(signature, tx)
+
+
+def check_fee(fee: int):
+    if fee < helpers.MIN_FEE or fee > helpers.MAX_FEE:
+        raise ProcessError('Fee must be in the range of 10 to 10,000 drops')
 
 
 def get_network_prefix():
